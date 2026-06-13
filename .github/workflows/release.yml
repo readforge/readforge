@@ -34,6 +34,14 @@ jobs:
           "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
           Write-Host "ReadForge version: $version"
 
+      - name: Apply one-click updater patch
+        shell: pwsh
+        run: |
+          $file = "electron/main.cjs"
+          $text = Get-Content -Raw -Path $file
+          $text = $text.Replace("autoInstallAfterDownload = Boolean(payload?.autoInstall)", "autoInstallAfterDownload = payload?.autoInstall !== false")
+          Set-Content -Path $file -Value $text -NoNewline
+
       - name: Build Windows app
         run: npm run dist -- --publish never
 
