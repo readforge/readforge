@@ -30,38 +30,171 @@
       .update-center > .update-card:nth-of-type(3) .primary-button {
         width: 100%;
       }
+      .book-card, .book-row { position: relative; }
+      .readforge-delete-book-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 20;
+        border: 1px solid rgba(255,255,255,.18);
+        border-radius: 999px;
+        padding: 7px 11px;
+        background: rgba(96, 22, 22, .82);
+        color: white;
+        font-family: Segoe UI, Arial, sans-serif;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity .15s ease, transform .15s ease, background .15s ease;
+        transform: translateY(-2px);
+      }
+      .book-card:hover .readforge-delete-book-button,
+      .book-row:hover .readforge-delete-book-button,
+      .readforge-delete-book-button:focus {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .readforge-delete-book-button:hover { background: rgba(180, 42, 42, .95); }
     </style>
   </head>
   <body>
     <div id="root"></div>
     <div id="readforge-version-badge">ReadForge v1.7.8</div>
     <script>
-      window.addEventListener('DOMContentLoaded', function () {
-        var badge = document.getElementById('readforge-version-badge');
-        var lastUpdatePanel = null;
-        function updateVersionBadgeVisibility() {
-          if (!badge) return;
-          var onLibrary = !!document.querySelector('.library-screen');
-          var inReader = !!document.querySelector('.reader-screen');
-          badge.style.display = onLibrary && !inReader ? 'block' : 'none';
+      (function () {
+        function cleanSpeechText(value) {
+          return String(value || '')
+            .replace(/\u00e2\u20ac\u2122/g, "'")
+            .replace(/\u00e2\u20ac\u02dc/g, "'")
+            .replace(/\u00e2\u20ac\u0153/g, '"')
+            .replace(/\u00e2\u20ac\u009d/g, '"')
+            .replace(/\u00e2\u20ac\u00a6/g, '...')
+            .replace(/\u00e2\u20ac\u201c/g, '-')
+            .replace(/\u00e2\u20ac\u201d/g, '-')
+            .replace(/\u00e2\u20ac\u00a2/g, ' ')
+            .replace(/\u00c2/g, '')
+            .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/g, '')
+            .replace(/\uFFFD/g, '')
+            .replace(/[•·▪▫■□◆◇●○▲▼►◄]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
         }
-        function autoStartUpdateCheck() {
-          var panel = document.querySelector('.update-center');
-          if (!panel || panel === lastUpdatePanel) return;
-          lastUpdatePanel = panel;
-          setTimeout(function () {
-            var buttons = Array.from(panel.querySelectorAll('button'));
-            var checkButton = buttons.find(function (b) { return (b.textContent || '').trim() === 'Check for updates'; });
-            if (checkButton && !checkButton.disabled) checkButton.click();
-          }, 300);
+
+        if (window.SpeechSynthesisUtterance) {
+          var OriginalUtterance = window.SpeechSynthesisUtterance;
+          window.SpeechSynthesisUtterance = function (text) {
+            return new OriginalUtterance(cleanSpeechText(text));
+          };
+          window.SpeechSynthesisUtterance.prototype = OriginalUtterance.prototype;
         }
-        function refreshReadForgeUiHelpers() {
-          updateVersionBadgeVisibility();
-          autoStartUpdateCheck();
+
+        if (window.speechSynthesis) {
+          var originalSpeak = window.speechSynthesis.speak.bind(window.speechSynthesis);
+          var originalCancel = window.speechSynthesis.cancel.bind(window.speechSynthesis);
+          var activeTimer = null;
+          function clearTimer() { if (activeTimer) { clearInterval(activeTimer); activeTimer = null; } }
+          window.speechSynthesis.cancel = function () { clearTimer(); return originalCancel(); };
+          window.speechSynthesis.speak = function (utterance) {
+            clearTimer();
+            var text = cleanSpeechText(utterance && utterance.text);
+            var words = text.match(/\S+\s*/g) || [];
+            var starts = [];
+            var pos = 0;
+            words.forEach(function (w) { starts.push(pos); pos += w.length; });
+            var rate = Math.max(0.5, Math.min(7, Number(utterance.rate || 1)));
+            var duration = Math.max(500, (words.length / (175 * rate)) * 60000);
+            var started = Date.now();
+            if (words.length) {
+              activeTimer = setInterval(function () {
+                if (window.speechSynthesis.paused) return;
+                var elapsed = Date.now() - started;
+                var index = Math.max(0, Math.min(words.length - 1, Math.floor((elapsed / duration) * words.length)));
+                if (typeof utterance.onboundary === 'function') {
+                  try { utterance.onboundary({ name: 'word', charIndex: starts[index] || 0, elapsedTime: elapsed }); } catch (e) {}
+                }
+              }, 70);
+            }
+            var oldEnd = utterance.onend;
+            var oldError = utterance.onerror;
+            utterance.onend = function (event) { clearTimer(); if (typeof oldEnd === 'function') oldEnd.call(utterance, event); };
+            utterance.onerror = function (event) { clearTimer(); if (typeof oldError === 'function') oldError.call(utterance, event); };
+            return originalSpeak(utterance);
+          };
         }
-        refreshReadForgeUiHelpers();
-        new MutationObserver(refreshReadForgeUiHelpers).observe(document.body, { childList: true, subtree: true, attributes: true });
-      });
+
+        function patchReadForgeSpeechBridge() {
+          if (!window.readforge || window.readforge.__cleanSpeechPatched) return;
+          if (typeof window.readforge.synthesizeWindowsNaturalSpeech === 'function') {
+            var originalNatural = window.readforge.synthesizeWindowsNaturalSpeech;
+            window.readforge.synthesizeWindowsNaturalSpeech = function (payload) {
+              return originalNatural(Object.assign({}, payload || {}, { text: cleanSpeechText((payload || {}).text) }));
+            };
+          }
+          window.readforge.__cleanSpeechPatched = true;
+        }
+
+        window.addEventListener('DOMContentLoaded', function () {
+          var badge = document.getElementById('readforge-version-badge');
+          var lastUpdatePanel = null;
+          patchReadForgeSpeechBridge();
+          setInterval(patchReadForgeSpeechBridge, 1000);
+
+          function updateVersionBadgeVisibility() {
+            if (!badge) return;
+            var onLibrary = !!document.querySelector('.library-screen');
+            var inReader = !!document.querySelector('.reader-screen');
+            badge.style.display = onLibrary && !inReader ? 'block' : 'none';
+          }
+
+          function autoStartUpdateCheck() {
+            var panel = document.querySelector('.update-center');
+            if (!panel || panel === lastUpdatePanel) return;
+            lastUpdatePanel = panel;
+            setTimeout(function () {
+              var buttons = Array.from(panel.querySelectorAll('button'));
+              var checkButton = buttons.find(function (b) { return (b.textContent || '').trim() === 'Check for updates'; });
+              if (checkButton && !checkButton.disabled) checkButton.click();
+            }, 300);
+          }
+
+          function addDeleteButtons() {
+            if (!window.readforge || !window.readforge.getLibrary || !window.readforge.saveLibrary) return;
+            var cards = Array.from(document.querySelectorAll('.book-card, .book-row'));
+            cards.forEach(function (card, index) {
+              if (card.querySelector('.readforge-delete-book-button')) return;
+              var title = (card.querySelector('h3') || {}).textContent || 'this book';
+              var button = document.createElement('button');
+              button.type = 'button';
+              button.className = 'readforge-delete-book-button';
+              button.textContent = 'Remove';
+              button.title = 'Remove this book from your library';
+              button.addEventListener('click', async function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!confirm('Remove "' + title + '" from your ReadForge library?')) return;
+                var library = await window.readforge.getLibrary();
+                var books = library.books || [];
+                var matchingTitle = String(title || '').trim().toLowerCase();
+                var match = books.find(function (b) { return String(b.title || 'Untitled').trim().toLowerCase() === matchingTitle; }) || books[index];
+                if (!match) return;
+                var next = Object.assign({}, library, { books: books.filter(function (b) { return b.id !== match.id; }) });
+                await window.readforge.saveLibrary(next);
+                location.reload();
+              });
+              card.appendChild(button);
+            });
+          }
+
+          function refreshReadForgeUiHelpers() {
+            updateVersionBadgeVisibility();
+            autoStartUpdateCheck();
+            addDeleteButtons();
+          }
+          refreshReadForgeUiHelpers();
+          new MutationObserver(refreshReadForgeUiHelpers).observe(document.body, { childList: true, subtree: true, attributes: true });
+        });
+      })();
     </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
