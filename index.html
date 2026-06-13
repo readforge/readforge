@@ -4,9 +4,67 @@
     <meta charset="UTF-8" />
     <title>ReadForge</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      .readforge-update-test-pop {
+        position: fixed;
+        inset: 0;
+        z-index: 999999;
+        display: grid;
+        place-items: center;
+        background: rgba(0,0,0,.48);
+        backdrop-filter: blur(10px);
+        font-family: Segoe UI, Arial, sans-serif;
+      }
+      .readforge-update-test-card {
+        width: min(520px, 92vw);
+        border-radius: 26px;
+        padding: 26px;
+        background: rgba(26, 28, 38, .95);
+        border: 1px solid rgba(255,255,255,.16);
+        color: #fff8ed;
+        box-shadow: 0 22px 70px rgba(0,0,0,.45);
+      }
+      .readforge-update-test-card h1 {
+        margin: 0 0 10px;
+        font-size: 32px;
+        letter-spacing: -.04em;
+      }
+      .readforge-update-test-card p {
+        color: rgba(255,255,255,.78);
+        line-height: 1.45;
+        font-size: 16px;
+      }
+      .readforge-update-test-card button {
+        margin-top: 12px;
+        padding: 12px 18px;
+        border: 0;
+        border-radius: 999px;
+        background: #f2c078;
+        color: #1f1711;
+        font-weight: 700;
+        cursor: pointer;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      window.addEventListener('DOMContentLoaded', function () {
+        var key = 'readforge-update-test-popup-1.7.3';
+        try {
+          if (localStorage.getItem(key) === 'shown') return;
+          localStorage.setItem(key, 'shown');
+        } catch (e) {}
+        setTimeout(function () {
+          var pop = document.createElement('div');
+          pop.className = 'readforge-update-test-pop';
+          pop.innerHTML = '<div class="readforge-update-test-card"><h1>ReadForge is working</h1><p>The updater worked. This popup came from the new update.</p><p>Have a good day!</p><button type="button">Close</button></div>';
+          pop.addEventListener('click', function (event) { if (event.target === pop) pop.remove(); });
+          pop.querySelector('button').addEventListener('click', function () { pop.remove(); });
+          document.body.appendChild(pop);
+        }, 900);
+      });
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
