@@ -34,12 +34,14 @@ jobs:
           "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
           Write-Host "ReadForge version: $version"
 
-      - name: Apply one-click updater patch
+      - name: Apply updater reliability patch
         shell: pwsh
         run: |
           $file = "electron/main.cjs"
           $text = Get-Content -Raw -Path $file
           $text = $text.Replace("autoInstallAfterDownload = Boolean(payload?.autoInstall)", "autoInstallAfterDownload = payload?.autoInstall !== false")
+          $text = $text.Replace("autoUpdater.autoDownload = false", "autoUpdater.autoDownload = true")
+          $text = $text.Replace("app.whenReady().then(() => { ensureDataDirs(); createWindow();", "app.whenReady().then(() => { ensureDataDirs(); setupAutoUpdater(); createWindow();")
           Set-Content -Path $file -Value $text -NoNewline
 
       - name: Build Windows app
