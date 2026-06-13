@@ -1,0 +1,2 @@
+Install Node.js LTS from the official site:
+https://nodejs.org/

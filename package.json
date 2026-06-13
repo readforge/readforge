@@ -1,0 +1,63 @@
+{
+  "name": "readforge",
+  "version": "1.7.0",
+  "private": true,
+  "description": "ReadForge - a modern Windows EPUB reader with read-aloud, themes, library covers, and reading progress.",
+  "main": "electron/main.cjs",
+  "author": "ReadForge",
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:vite\" \"npm:dev:electron\"",
+    "dev:vite": "vite --host 127.0.0.1 --port 5173",
+    "dev:electron": "wait-on http://127.0.0.1:5173 && electron .",
+    "build": "vite build",
+    "dist": "vite build && electron-builder --win nsis portable"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "jszip": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "latest",
+    "electron-updater": "latest",
+    "electron-log": "latest"
+  },
+  "devDependencies": {
+    "concurrently": "latest",
+    "electron": "latest",
+    "electron-builder": "latest",
+    "wait-on": "latest"
+  },
+  "build": {
+    "appId": "com.readforge.reader",
+    "productName": "ReadForge",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ReadForge"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "readforge",
+        "repo": "readforge"
+      }
+    ]
+  }
+}
