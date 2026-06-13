@@ -4,9 +4,29 @@
     <meta charset="UTF-8" />
     <title>ReadForge</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      #readforge-version-badge {
+        position: fixed;
+        right: 14px;
+        bottom: 10px;
+        z-index: 99999;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.56);
+        color: rgba(255, 255, 255, 0.86);
+        font-family: Segoe UI, Arial, sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        backdrop-filter: blur(10px);
+        pointer-events: none;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="readforge-version-badge">ReadForge v1.7.6</div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
