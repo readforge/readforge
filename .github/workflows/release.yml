@@ -15,7 +15,7 @@ jobs:
     runs-on: windows-latest
 
     env:
-      RELEASE_VERSION: 1.7.13
+      RELEASE_VERSION: 1.7.14
 
     steps:
       - name: Check out project
