@@ -2,6 +2,8 @@ name: Build and Publish ReadForge Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
   workflow_dispatch:
@@ -25,7 +27,22 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build and publish release
+      - name: Read package version
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "ReadForge version: $version"
+
+      - name: Build Windows app
+        run: npm run dist -- --publish never
+
+      - name: Publish GitHub release
+        shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run dist -- --publish always
+        run: |
+          $tag = "v$env:VERSION"
+          Write-Host "Publishing $tag"
+          gh release delete $tag --yes --cleanup-tag 2>$null
+          gh release create $tag "release/*" --title "ReadForge $tag" --notes "Automated ReadForge release $tag" --latest
