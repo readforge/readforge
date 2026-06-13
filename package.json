@@ -1,6 +1,6 @@
 {
   "name": "readforge",
-  "version": "1.7.3",
+  "version": "1.7.4",
   "private": true,
   "description": "ReadForge - a modern Windows EPUB reader with read-aloud, themes, library covers, and reading progress.",
   "main": "electron/main.cjs",
@@ -11,7 +11,7 @@
     "dev:vite": "vite --host 127.0.0.1 --port 5173",
     "dev:electron": "wait-on http://127.0.0.1:5173 && electron .",
     "build": "vite build",
-    "dist": "vite build && electron-builder --win nsis portable"
+    "dist": "vite build && electron-builder --win nsis"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -31,6 +31,7 @@
   "build": {
     "appId": "com.readforge.reader",
     "productName": "ReadForge",
+    "artifactName": "ReadForge-Setup-${version}.${ext}",
     "directories": {
       "output": "release"
     },
@@ -41,8 +42,7 @@
     ],
     "win": {
       "target": [
-        "nsis",
-        "portable"
+        "nsis"
       ]
     },
     "nsis": {
