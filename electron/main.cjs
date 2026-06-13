@@ -9,6 +9,7 @@ let log = null
 try { log = require('electron-log') } catch { log = console }
 
 let mainWindow
+let autoInstallAfterDownload = false
 
 function sendUpdateEvent(payload) {
   try {
@@ -27,7 +28,10 @@ function setupAutoUpdater() {
   autoUpdater.on('update-not-available', info => sendUpdateEvent({ type: 'not-available', info, message: 'ReadForge is up to date.' }))
   autoUpdater.on('error', error => sendUpdateEvent({ type: 'error', message: error?.message || String(error) }))
   autoUpdater.on('download-progress', progress => sendUpdateEvent({ type: 'download-progress', progress, message: `Downloading update: ${Math.round(progress?.percent || 0)}%` }))
-  autoUpdater.on('update-downloaded', info => sendUpdateEvent({ type: 'downloaded', info, message: 'Update downloaded. Restart to install.' }))
+  autoUpdater.on('update-downloaded', info => {
+    sendUpdateEvent({ type: 'downloaded', info, message: autoInstallAfterDownload ? 'Update downloaded. Restarting to install...' : 'Update downloaded. Restart to install.' })
+    if (autoInstallAfterDownload) setTimeout(() => { try { autoUpdater.quitAndInstall(false, true) } catch (error) { sendUpdateEvent({ type: 'error', message: error?.message || String(error) }) } }, 1000)
+  })
 }
 
 function userDataDir() { return app.getPath('userData') }
@@ -94,6 +98,8 @@ ipcMain.handle('updater:checkForUpdates', async (_event, payload) => {
   const owner = String(payload?.owner || '').trim()
   const repo = String(payload?.repo || '').trim()
   const feedUrl = String(payload?.feedUrl || '').trim()
+  autoInstallAfterDownload = Boolean(payload?.autoInstall)
+  autoUpdater.autoDownload = autoInstallAfterDownload
 
   if (provider === 'github' || (owner && repo)) {
     if (!owner || !repo) throw new Error('GitHub owner and repo are required.')
