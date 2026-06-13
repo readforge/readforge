@@ -47,17 +47,14 @@
       }
       .book-card:hover .readforge-delete-book-button,
       .book-row:hover .readforge-delete-book-button,
-      .readforge-delete-book-button:focus {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      .readforge-delete-book-button:focus { opacity: 1; transform: translateY(0); }
       .readforge-delete-book-button:hover { background: rgba(180, 42, 42, .95); }
       .readforge-one-click-note { margin-top: 10px; font-size: 12px; opacity: .8; }
     </style>
   </head>
   <body>
     <div id="root"></div>
-    <div id="readforge-version-badge">ReadForge v1.7.14</div>
+    <div id="readforge-version-badge">ReadForge v1.7.15</div>
     <script>
       (function () {
         function hideVoiceWindowsUi() {
@@ -75,18 +72,18 @@
                 select.value = 'browser';
                 select.dispatchEvent(new Event('change', { bubbles: true }));
               }
-              label.style.display = 'none';
+              if (label.style.display !== 'none') label.style.display = 'none';
             }
-            if (labelText === 'Voice') span.textContent = 'Voice Styles';
-            if ((label.textContent || '').indexOf('Windows voice') >= 0) label.style.display = 'none';
+            if (labelText === 'Voice' && span.textContent !== 'Voice Styles') span.textContent = 'Voice Styles';
+            if ((label.textContent || '').indexOf('Windows voice') >= 0 && label.style.display !== 'none') label.style.display = 'none';
           });
           Array.from(document.querySelectorAll('button')).forEach(function (btn) {
             var text = btn.textContent || '';
-            if (text.indexOf('Refresh Windows') >= 0 || text.indexOf('Windows Natural') >= 0) btn.style.display = 'none';
+            if ((text.indexOf('Refresh Windows') >= 0 || text.indexOf('Windows Natural') >= 0) && btn.style.display !== 'none') btn.style.display = 'none';
           });
           Array.from(document.querySelectorAll('p.hint')).forEach(function (hint) {
             var text = hint.textContent || '';
-            if (text.indexOf('Andrew') >= 0 || text.indexOf('Windows exposes') >= 0 || text.indexOf('Windows voice') >= 0) hint.style.display = 'none';
+            if ((text.indexOf('Andrew') >= 0 || text.indexOf('Windows exposes') >= 0 || text.indexOf('Windows voice') >= 0) && hint.style.display !== 'none') hint.style.display = 'none';
           });
         }
 
@@ -95,12 +92,7 @@
           if (!window.readforge.__oneClickUpdaterPatched && typeof window.readforge.checkForUpdates === 'function') {
             var originalCheck = window.readforge.checkForUpdates;
             window.readforge.checkForUpdates = function (payload) {
-              return originalCheck(Object.assign({}, payload || {}, {
-                provider: 'github',
-                owner: 'readforge',
-                repo: 'readforge',
-                autoInstall: true
-              }));
+              return originalCheck(Object.assign({}, payload || {}, { provider: 'github', owner: 'readforge', repo: 'readforge', autoInstall: true }));
             };
             window.readforge.__oneClickUpdaterPatched = true;
           }
@@ -121,7 +113,8 @@
             if (!badge) return;
             var onLibrary = !!document.querySelector('.library-screen');
             var inReader = !!document.querySelector('.reader-screen');
-            badge.style.display = onLibrary && !inReader ? 'block' : 'none';
+            var nextDisplay = onLibrary && !inReader ? 'block' : 'none';
+            if (badge.style.display !== nextDisplay) badge.style.display = nextDisplay;
           }
 
           function patchUpdateButtons() {
@@ -134,7 +127,7 @@
                 button.classList.add('full');
                 button.title = 'Checks GitHub, downloads the update, then restarts ReadForge to install it.';
               }
-              if (text === 'Download update' || text === 'Restart and install downloaded update') button.style.display = 'none';
+              if ((text === 'Download update' || text === 'Restart and install downloaded update') && button.style.display !== 'none') button.style.display = 'none';
             });
             var card = Array.from(panel.querySelectorAll('.update-card')).find(function (c) { return (c.textContent || '').indexOf('Check/install') >= 0; });
             if (card && !card.querySelector('.readforge-one-click-note')) {
@@ -172,14 +165,21 @@
             });
           }
 
+          var helperScheduled = false;
           function refreshHelpers() {
+            helperScheduled = false;
             updateVersionBadgeVisibility();
             hideVoiceWindowsUi();
             patchUpdateButtons();
             addDeleteButtons();
           }
-          refreshHelpers();
-          new MutationObserver(refreshHelpers).observe(document.body, { childList: true, subtree: true, attributes: true });
+          function scheduleRefresh() {
+            if (helperScheduled) return;
+            helperScheduled = true;
+            requestAnimationFrame(refreshHelpers);
+          }
+          scheduleRefresh();
+          new MutationObserver(scheduleRefresh).observe(document.body, { childList: true, subtree: true });
         });
       })();
     </script>
