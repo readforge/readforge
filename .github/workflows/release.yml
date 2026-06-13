@@ -1,10 +1,11 @@
 name: Build and Publish ReadForge Release
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+
+concurrency:
+  group: readforge-release
+  cancel-in-progress: true
 
 permissions:
   contents: write
