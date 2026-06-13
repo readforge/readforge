@@ -45,4 +45,10 @@ jobs:
           $tag = "v$env:VERSION"
           Write-Host "Publishing $tag"
           gh release delete $tag --yes --cleanup-tag 2>$null
-          gh release create $tag "release/*" --title "ReadForge $tag" --notes "Automated ReadForge release $tag" --latest
+          $assets = Get-ChildItem -Path "release" -File | ForEach-Object { $_.FullName }
+          if (-not $assets -or $assets.Count -eq 0) {
+            throw "No release asset files were found in the release folder."
+          }
+          Write-Host "Assets to upload:"
+          $assets | ForEach-Object { Write-Host $_ }
+          gh release create $tag $assets --title "ReadForge $tag" --notes "Automated ReadForge release $tag" --latest
