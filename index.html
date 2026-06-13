@@ -57,6 +57,7 @@
     <div id="readforge-version-badge">ReadForge v1.7.15</div>
     <script>
       (function () {
+        function textKey(value) { return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ''); }
         function hideVoiceWindowsUi() {
           Array.from(document.querySelectorAll('option')).forEach(function (opt) {
             var text = opt.textContent || '';
@@ -80,10 +81,6 @@
           Array.from(document.querySelectorAll('button')).forEach(function (btn) {
             var text = btn.textContent || '';
             if ((text.indexOf('Refresh Windows') >= 0 || text.indexOf('Windows Natural') >= 0) && btn.style.display !== 'none') btn.style.display = 'none';
-          });
-          Array.from(document.querySelectorAll('p.hint')).forEach(function (hint) {
-            var text = hint.textContent || '';
-            if ((text.indexOf('Andrew') >= 0 || text.indexOf('Windows exposes') >= 0 || text.indexOf('Windows voice') >= 0) && hint.style.display !== 'none') hint.style.display = 'none';
           });
         }
 
@@ -117,6 +114,25 @@
             if (badge.style.display !== nextDisplay) badge.style.display = nextDisplay;
           }
 
+          function fixChapterLabels() {
+            var bookTitle = (document.querySelector('.top-book-meta strong') || {}).textContent || '';
+            var bookKey = textKey(bookTitle);
+            if (!bookKey) return;
+            var chapterInfo = (document.querySelector('.chapter-heading p') || {}).textContent || '';
+            var match = chapterInfo.match(/Chapter\s+(\d+)/i);
+            var currentFallback = match ? 'Chapter ' + match[1] : 'Chapter';
+            var chapterHeading = document.querySelector('.chapter-heading h1');
+            if (chapterHeading && textKey(chapterHeading.textContent) === bookKey) chapterHeading.textContent = currentFallback;
+            Array.from(document.querySelectorAll('.toc-list button')).forEach(function (button, index) {
+              if (textKey(button.textContent) === bookKey) button.textContent = 'Chapter ' + (index + 1);
+            });
+            var small = document.querySelector('.top-book-meta small');
+            if (small && small.textContent && textKey(small.textContent.split('·')[0]) === bookKey) {
+              var percent = small.textContent.indexOf('·') >= 0 ? small.textContent.slice(small.textContent.indexOf('·')) : '';
+              small.textContent = currentFallback + ' ' + percent;
+            }
+          }
+
           function patchUpdateButtons() {
             var panel = document.querySelector('.update-center');
             if (!panel) return;
@@ -129,13 +145,6 @@
               }
               if ((text === 'Download update' || text === 'Restart and install downloaded update') && button.style.display !== 'none') button.style.display = 'none';
             });
-            var card = Array.from(panel.querySelectorAll('.update-card')).find(function (c) { return (c.textContent || '').indexOf('Check/install') >= 0; });
-            if (card && !card.querySelector('.readforge-one-click-note')) {
-              var note = document.createElement('p');
-              note.className = 'readforge-one-click-note';
-              note.textContent = 'One-button update is enabled: check, download, and restart/install happen from the main button when a newer release exists.';
-              card.appendChild(note);
-            }
           }
 
           function addDeleteButtons() {
@@ -170,6 +179,7 @@
             helperScheduled = false;
             updateVersionBadgeVisibility();
             hideVoiceWindowsUi();
+            fixChapterLabels();
             patchUpdateButtons();
             addDeleteButtons();
           }
