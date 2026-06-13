@@ -52,6 +52,11 @@
         transform: translateY(0);
       }
       .readforge-delete-book-button:hover { background: rgba(180, 42, 42, .95); }
+      .readforge-one-click-note {
+        margin-top: 10px;
+        font-size: 12px;
+        opacity: .8;
+      }
     </style>
   </head>
   <body>
@@ -113,15 +118,27 @@
           };
         }
 
-        function patchReadForgeSpeechBridge() {
-          if (!window.readforge || window.readforge.__cleanSpeechPatched) return;
-          if (typeof window.readforge.synthesizeWindowsNaturalSpeech === 'function') {
+        function patchReadForgeBridge() {
+          if (!window.readforge) return;
+          if (!window.readforge.__cleanSpeechPatched && typeof window.readforge.synthesizeWindowsNaturalSpeech === 'function') {
             var originalNatural = window.readforge.synthesizeWindowsNaturalSpeech;
             window.readforge.synthesizeWindowsNaturalSpeech = function (payload) {
               return originalNatural(Object.assign({}, payload || {}, { text: cleanSpeechText((payload || {}).text) }));
             };
+            window.readforge.__cleanSpeechPatched = true;
           }
-          window.readforge.__cleanSpeechPatched = true;
+          if (!window.readforge.__oneClickUpdaterPatched && typeof window.readforge.checkForUpdates === 'function') {
+            var originalCheck = window.readforge.checkForUpdates;
+            window.readforge.checkForUpdates = function (payload) {
+              return originalCheck(Object.assign({}, payload || {}, {
+                provider: 'github',
+                owner: 'readforge',
+                repo: 'readforge',
+                autoInstall: true
+              }));
+            };
+            window.readforge.__oneClickUpdaterPatched = true;
+          }
         }
 
         window.addEventListener('DOMContentLoaded', function () {
@@ -132,8 +149,8 @@
             if (/HD voice|Natural voice|Windows voice/i.test(text)) return;
             return originalAlert.call(window, message);
           };
-          patchReadForgeSpeechBridge();
-          setInterval(patchReadForgeSpeechBridge, 1000);
+          patchReadForgeBridge();
+          setInterval(patchReadForgeBridge, 1000);
 
           function updateVersionBadgeVisibility() {
             if (!badge) return;
@@ -154,6 +171,30 @@
                 hint.textContent = 'ReadForge can only use voices Windows exposes to desktop apps. If Andrew HD is not shown in the Windows voice list, choose one of the listed voices instead.';
               }
             });
+          }
+
+          function patchUpdateButtons() {
+            var panel = document.querySelector('.update-center');
+            if (!panel) return;
+            var buttons = Array.from(panel.querySelectorAll('button'));
+            buttons.forEach(function (button) {
+              var text = (button.textContent || '').trim();
+              if (text === 'Check for updates') {
+                button.textContent = 'Check for updates and install';
+                button.classList.add('full');
+                button.title = 'Checks GitHub, downloads the update, then restarts ReadForge to install it.';
+              }
+              if (text === 'Download update' || text === 'Restart and install downloaded update') {
+                button.style.display = 'none';
+              }
+            });
+            var card = Array.from(panel.querySelectorAll('.update-card')).find(function (c) { return (c.textContent || '').includes('Check/install'); });
+            if (card && !card.querySelector('.readforge-one-click-note')) {
+              var note = document.createElement('p');
+              note.className = 'readforge-one-click-note';
+              note.textContent = 'One-button update is enabled: check, download, and restart/install happen from the main button when a newer release exists.';
+              card.appendChild(note);
+            }
           }
 
           function addDeleteButtons() {
@@ -188,6 +229,7 @@
           function refreshHelpers() {
             updateVersionBadgeVisibility();
             relabelVoiceUi();
+            patchUpdateButtons();
             addDeleteButtons();
           }
           refreshHelpers();
