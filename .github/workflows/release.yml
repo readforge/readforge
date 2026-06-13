@@ -1,6 +1,8 @@
 name: Build and Publish ReadForge Release
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -15,7 +17,7 @@ jobs:
     runs-on: windows-latest
 
     env:
-      RELEASE_VERSION: 1.7.16
+      RELEASE_VERSION: 1.7.17
 
     steps:
       - name: Check out project
@@ -39,7 +41,7 @@ jobs:
           "VERSION=$env:RELEASE_VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append
           Write-Host "ReadForge release version: $env:RELEASE_VERSION"
 
-      - name: Apply app reliability patch
+      - name: Apply updater reliability patch
         shell: pwsh
         run: |
           $file = "electron/main.cjs"
@@ -48,22 +50,10 @@ jobs:
           $text = $text.Replace("autoUpdater.autoDownload = false", "autoUpdater.autoDownload = true")
           $text = $text.Replace("app.whenReady().then(() => { ensureDataDirs(); createWindow();", "app.whenReady().then(() => { ensureDataDirs(); setupAutoUpdater(); createWindow();")
           Set-Content -Path $file -Value $text -NoNewline
-
           $htmlFile = "index.html"
           $html = Get-Content -Raw -Path $htmlFile
           $html = $html -replace "ReadForge v[0-9]+\.[0-9]+\.[0-9]+", "ReadForge v$env:VERSION"
           Set-Content -Path $htmlFile -Value $html -NoNewline
-
-          $jsxFile = "src/main.jsx"
-          $jsx = Get-Content -Raw -Path $jsxFile
-          $jsx = $jsx.Replace("function zipFile(zip, p) { const n = normalizeZipPath(p); return zip.file(n) || zip.file(decodeURIComponent(n)) || zip.file(n.replace(/%20/g, ' ')) }", "function zipFile(zip, p) { const n = normalizeZipPath(p); return zip.file(n) || zip.file(decodeURIComponent(n)) || zip.file(n.replace(/%20/g, ' ')) }`nfunction mimeFromPath(p) { const ext=String(p||'').split('?')[0].split('.').pop().toLowerCase(); return ({jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',svg:'image/svg+xml',bmp:'image/bmp'})[ext] || 'application/octet-stream' }`nasync function inlineEpubImages(doc, zip, chapterPath) { const base=String(chapterPath||'').split('/').slice(0,-1).join('/'); for (const img of [...doc.querySelectorAll('img')]) { const src=img.getAttribute('src')||''; if(!src || /^(data:|https?:|blob:)/i.test(src)) continue; const f=zipFile(zip, joinZipPath(base, src)); if(f) img.setAttribute('src', 'data:'+mimeFromPath(src)+';base64,'+await f.async('base64')); } }")
-          $jsx = $jsx.Replace("function extractChapter(html, fallbackTitle) {", "async function extractChapter(html, fallbackTitle, zip, chapterPath) {")
-          $jsx = $jsx.Replace("sanitize(doc)`n  const body", "sanitize(doc)`n  if (zip) await inlineEpubImages(doc, zip, chapterPath)`n  const body")
-          $jsx = $jsx.Replace("const els = [...body.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,blockquote,pre')]", "const els = [...body.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,figure,img')]")
-          $jsx = $jsx.Replace("const ch = extractChapter(await f.async('text'), fallback)", "const ch = await extractChapter(await f.async('text'), fallback, zip, item.fullPath)")
-          $jsx = $jsx.Replace("textAlign: 'left', readingMode: 'scroll', paragraphsPerPage: 6, displayMode: 'clean'", "textAlign: 'left', readingMode: 'scroll', paragraphsPerPage: 6, displayMode: 'original'")
-          $jsx = $jsx.Replace("const moveChapter=i=>{stopReading(); setChapterIndex(clamp(i,0,bookData.chapters.length-1)); setPageIndex(0); setCurrentParagraph(0); setActiveParagraph(null); setActiveWord(null)}", "const moveChapter=i=>{stopReading(); setChapterIndex(clamp(i,0,bookData.chapters.length-1)); setPageIndex(0); setCurrentParagraph(0); setActiveParagraph(null); setActiveWord(null); setTimeout(()=>{document.querySelector('.reader-stage')?.scrollTo({top:0,behavior:'smooth'}); document.querySelector('.book-page')?.scrollIntoView({block:'start',behavior:'smooth'})},80)}")
-          Set-Content -Path $jsxFile -Value $jsx -NoNewline
 
       - name: Build Windows app
         shell: pwsh
