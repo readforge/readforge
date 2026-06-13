@@ -38,14 +38,29 @@
     <script>
       window.addEventListener('DOMContentLoaded', function () {
         var badge = document.getElementById('readforge-version-badge');
+        var lastUpdatePanel = null;
         function updateVersionBadgeVisibility() {
           if (!badge) return;
           var onLibrary = !!document.querySelector('.library-screen');
           var inReader = !!document.querySelector('.reader-screen');
           badge.style.display = onLibrary && !inReader ? 'block' : 'none';
         }
-        updateVersionBadgeVisibility();
-        new MutationObserver(updateVersionBadgeVisibility).observe(document.body, { childList: true, subtree: true, attributes: true });
+        function autoStartUpdateCheck() {
+          var panel = document.querySelector('.update-center');
+          if (!panel || panel === lastUpdatePanel) return;
+          lastUpdatePanel = panel;
+          setTimeout(function () {
+            var buttons = Array.from(panel.querySelectorAll('button'));
+            var checkButton = buttons.find(function (b) { return (b.textContent || '').trim() === 'Check for updates'; });
+            if (checkButton && !checkButton.disabled) checkButton.click();
+          }, 300);
+        }
+        function refreshReadForgeUiHelpers() {
+          updateVersionBadgeVisibility();
+          autoStartUpdateCheck();
+        }
+        refreshReadForgeUiHelpers();
+        new MutationObserver(refreshReadForgeUiHelpers).observe(document.body, { childList: true, subtree: true, attributes: true });
       });
     </script>
     <script type="module" src="/src/main.jsx"></script>
