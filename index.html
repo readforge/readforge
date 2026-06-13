@@ -52,81 +52,46 @@
         transform: translateY(0);
       }
       .readforge-delete-book-button:hover { background: rgba(180, 42, 42, .95); }
-      .readforge-one-click-note {
-        margin-top: 10px;
-        font-size: 12px;
-        opacity: .8;
-      }
+      .readforge-one-click-note { margin-top: 10px; font-size: 12px; opacity: .8; }
     </style>
   </head>
   <body>
     <div id="root"></div>
-    <div id="readforge-version-badge">ReadForge v1.7.13</div>
+    <div id="readforge-version-badge">ReadForge v1.7.14</div>
     <script>
       (function () {
-        function cleanSpeechText(value) {
-          return String(value || '')
-            .replace(/\u00e2(?:\u20ac|\u0080)(?:\u2122|\u0099)/g, "'")
-            .replace(/\u00e2(?:\u20ac|\u0080)(?:\u02dc|\u0098)/g, "'")
-            .replace(/\u00e2(?:\u20ac|\u0080)(?:\u0153|\u009c)/g, '"')
-            .replace(/\u00e2(?:\u20ac|\u0080)(?:\u009d)/g, '"')
-            .replace(/\u00e2(?:\u20ac|\u0080)(?:\u00a6)/g, '...')
-            .replace(/\u00e2(?:\u20ac|\u0080)(?:\u201c|\u0093|\u201d|\u0094)/g, '-')
-            .replace(/\u20ac(?:\u2122|\u0099)/g, "'")
-            .replace(/\u20ac(?:\u0153|\u009c|\u009d)/g, '"')
-            .replace(/\u20ac\u00a6/g, '...')
-            .replace(/\u20ac(?:\u201c|\u201d|\u0093|\u0094)/g, '-')
-            .replace(/\u00e2\u20ac\u00a2/g, ' ')
-            .replace(/[\u00e2\u20ac\u2122\u00c2]/g, '')
-            .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/g, '')
-            .replace(/\uFFFD/g, '')
-            .replace(/[•·▪▫■□◆◇●○▲▼►◄]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-        }
-
-        if (window.SpeechSynthesisUtterance) {
-          var OriginalUtterance = window.SpeechSynthesisUtterance;
-          window.SpeechSynthesisUtterance = function (text) {
-            return new OriginalUtterance(cleanSpeechText(text));
-          };
-          window.SpeechSynthesisUtterance.prototype = OriginalUtterance.prototype;
-        }
-
-        if (window.speechSynthesis) {
-          var originalSpeak = window.speechSynthesis.speak.bind(window.speechSynthesis);
-          var originalCancel = window.speechSynthesis.cancel.bind(window.speechSynthesis);
-          var lastBoundaryIndex = 0;
-          window.speechSynthesis.cancel = function () { lastBoundaryIndex = 0; return originalCancel(); };
-          window.speechSynthesis.speak = function (utterance) {
-            lastBoundaryIndex = 0;
-            var originalBoundary = utterance.onboundary;
-            if (typeof originalBoundary === 'function') {
-              utterance.onboundary = function (event) {
-                if (typeof event.charIndex === 'number') {
-                  if (event.charIndex < lastBoundaryIndex) return;
-                  lastBoundaryIndex = event.charIndex;
-                }
-                originalBoundary.call(utterance, event);
-              };
+        function hideVoiceWindowsUi() {
+          Array.from(document.querySelectorAll('option')).forEach(function (opt) {
+            var text = opt.textContent || '';
+            if (opt.value === 'browser' || text.indexOf('Browser/Chromium voices') >= 0) opt.textContent = 'Voice Styles';
+            if (opt.value === 'windowsNatural' || text.indexOf('Windows Natural') >= 0 || text.indexOf('Windows voices detected') >= 0) opt.remove();
+          });
+          Array.from(document.querySelectorAll('label.setting-row')).forEach(function (label) {
+            var span = label.querySelector('span');
+            var select = label.querySelector('select');
+            var labelText = (span && span.textContent || '').trim();
+            if (labelText === 'Voice engine') {
+              if (select && select.value !== 'browser') {
+                select.value = 'browser';
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+              }
+              label.style.display = 'none';
             }
-            var oldEnd = utterance.onend;
-            var oldError = utterance.onerror;
-            utterance.onend = function (event) { lastBoundaryIndex = 0; if (typeof oldEnd === 'function') oldEnd.call(utterance, event); };
-            utterance.onerror = function (event) { lastBoundaryIndex = 0; if (typeof oldError === 'function') oldError.call(utterance, event); };
-            return originalSpeak(utterance);
-          };
+            if (labelText === 'Voice') span.textContent = 'Voice Styles';
+            if ((label.textContent || '').indexOf('Windows voice') >= 0) label.style.display = 'none';
+          });
+          Array.from(document.querySelectorAll('button')).forEach(function (btn) {
+            var text = btn.textContent || '';
+            if (text.indexOf('Refresh Windows') >= 0 || text.indexOf('Windows Natural') >= 0) btn.style.display = 'none';
+          });
+          Array.from(document.querySelectorAll('p.hint')).forEach(function (hint) {
+            var text = hint.textContent || '';
+            if (text.indexOf('Andrew') >= 0 || text.indexOf('Windows exposes') >= 0 || text.indexOf('Windows voice') >= 0) hint.style.display = 'none';
+          });
         }
 
         function patchReadForgeBridge() {
           if (!window.readforge) return;
-          if (!window.readforge.__cleanSpeechPatched && typeof window.readforge.synthesizeWindowsNaturalSpeech === 'function') {
-            var originalNatural = window.readforge.synthesizeWindowsNaturalSpeech;
-            window.readforge.synthesizeWindowsNaturalSpeech = function (payload) {
-              return originalNatural(Object.assign({}, payload || {}, { text: cleanSpeechText((payload || {}).text) }));
-            };
-            window.readforge.__cleanSpeechPatched = true;
-          }
           if (!window.readforge.__oneClickUpdaterPatched && typeof window.readforge.checkForUpdates === 'function') {
             var originalCheck = window.readforge.checkForUpdates;
             window.readforge.checkForUpdates = function (payload) {
@@ -159,36 +124,19 @@
             badge.style.display = onLibrary && !inReader ? 'block' : 'none';
           }
 
-          function relabelVoiceUi() {
-            Array.from(document.querySelectorAll('option')).forEach(function (opt) {
-              if ((opt.textContent || '').includes('Windows Natural voices - Andrew HD')) opt.textContent = 'Windows voices detected by ReadForge';
-            });
-            Array.from(document.querySelectorAll('button')).forEach(function (btn) {
-              if ((btn.textContent || '').includes('Refresh Windows Natural voices')) btn.textContent = 'Refresh Windows voices';
-            });
-            Array.from(document.querySelectorAll('p.hint')).forEach(function (hint) {
-              if ((hint.textContent || '').includes('Microsoft Andrew Natural HD')) {
-                hint.textContent = 'ReadForge can only use voices Windows exposes to desktop apps. If Andrew HD is not shown in the Windows voice list, choose one of the listed voices instead.';
-              }
-            });
-          }
-
           function patchUpdateButtons() {
             var panel = document.querySelector('.update-center');
             if (!panel) return;
-            var buttons = Array.from(panel.querySelectorAll('button'));
-            buttons.forEach(function (button) {
+            Array.from(panel.querySelectorAll('button')).forEach(function (button) {
               var text = (button.textContent || '').trim();
               if (text === 'Check for updates') {
                 button.textContent = 'Check for updates and install';
                 button.classList.add('full');
                 button.title = 'Checks GitHub, downloads the update, then restarts ReadForge to install it.';
               }
-              if (text === 'Download update' || text === 'Restart and install downloaded update') {
-                button.style.display = 'none';
-              }
+              if (text === 'Download update' || text === 'Restart and install downloaded update') button.style.display = 'none';
             });
-            var card = Array.from(panel.querySelectorAll('.update-card')).find(function (c) { return (c.textContent || '').includes('Check/install'); });
+            var card = Array.from(panel.querySelectorAll('.update-card')).find(function (c) { return (c.textContent || '').indexOf('Check/install') >= 0; });
             if (card && !card.querySelector('.readforge-one-click-note')) {
               var note = document.createElement('p');
               note.className = 'readforge-one-click-note';
@@ -199,8 +147,7 @@
 
           function addDeleteButtons() {
             if (!window.readforge || !window.readforge.getLibrary || !window.readforge.saveLibrary) return;
-            var cards = Array.from(document.querySelectorAll('.book-card, .book-row'));
-            cards.forEach(function (card, index) {
+            Array.from(document.querySelectorAll('.book-card, .book-row')).forEach(function (card, index) {
               if (card.querySelector('.readforge-delete-book-button')) return;
               var title = (card.querySelector('h3') || {}).textContent || 'this book';
               var button = document.createElement('button');
@@ -218,8 +165,7 @@
                 var matchingTitle = String(title || '').trim().toLowerCase();
                 var match = books.find(function (b) { return String(b.title || 'Untitled').trim().toLowerCase() === matchingTitle; }) || books[index];
                 if (!match) return;
-                var next = Object.assign({}, library, { books: books.filter(function (b) { return b.id !== match.id; }) });
-                await window.readforge.saveLibrary(next);
+                await window.readforge.saveLibrary(Object.assign({}, library, { books: books.filter(function (b) { return b.id !== match.id; }) }));
                 location.reload();
               });
               card.appendChild(button);
@@ -228,7 +174,7 @@
 
           function refreshHelpers() {
             updateVersionBadgeVisibility();
-            relabelVoiceUi();
+            hideVoiceWindowsUi();
             patchUpdateButtons();
             addDeleteButtons();
           }
