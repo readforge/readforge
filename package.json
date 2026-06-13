@@ -1,6 +1,6 @@
 {
   "name": "readforge",
-  "version": "1.7.4",
+  "version": "1.7.5",
   "private": true,
   "description": "ReadForge - a modern Windows EPUB reader with read-aloud, themes, library covers, and reading progress.",
   "main": "electron/main.cjs",
