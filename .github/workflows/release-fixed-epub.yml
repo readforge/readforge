@@ -1,0 +1,87 @@
+name: Build Fixed EPUB Reader Release
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: readforge-fixed-release
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    env:
+      RELEASE_VERSION: 1.7.18
+
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Set release version
+        shell: pwsh
+        run: |
+          $pkgPath = "package.json"
+          $pkg = Get-Content -Raw -Path $pkgPath | ConvertFrom-Json
+          $pkg.version = $env:RELEASE_VERSION
+          $pkg | ConvertTo-Json -Depth 20 | Set-Content -Path $pkgPath -NoNewline
+          "VERSION=$env:RELEASE_VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "ReadForge release version: $env:RELEASE_VERSION"
+
+      - name: Apply fixed EPUB reader patches
+        run: node scripts/patch-readforge-release.js
+
+      - name: Build Windows app
+        shell: pwsh
+        run: |
+          $maxAttempts = 3
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            Write-Host "Build attempt $attempt of $maxAttempts"
+            npm run dist -- --publish never
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "Build succeeded."
+              exit 0
+            }
+            if ($attempt -lt $maxAttempts) {
+              $delay = 20 * $attempt
+              Write-Host "Build failed, waiting $delay seconds and trying again..."
+              Start-Sleep -Seconds $delay
+            }
+          }
+          throw "Windows build failed after $maxAttempts attempts."
+
+      - name: Verify release files
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path "release" -File | ForEach-Object { Write-Host "Asset: $($_.Name)" }
+          if (-not (Test-Path "release/latest.yml")) { throw "Missing latest.yml" }
+          if (-not (Get-ChildItem -Path "release" -Filter "*.exe" -File)) { throw "Missing installer exe" }
+
+      - name: Publish fixed GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "v$env:VERSION"
+          Write-Host "Publishing fixed release $tag"
+          gh release delete $tag --yes --cleanup-tag 2>$null
+          git tag -d $tag 2>$null
+          git push origin ":refs/tags/$tag" 2>$null
+          gh release create $tag --target "$env:GITHUB_SHA" --title "ReadForge $tag" --notes "Fixed EPUB images, chapter titles, chapter navigation, and browser-only Voice Styles." --latest
+          gh release upload $tag "release/latest.yml" --clobber
+          $installer = Get-ChildItem -Path "release" -Filter "*.exe" -File | Select-Object -First 1
+          if (-not $installer) { throw "Missing installer exe" }
+          gh release upload $tag $installer.FullName --clobber
+          $blockmap = Get-ChildItem -Path "release" -Filter "*.blockmap" -File | Select-Object -First 1
+          if ($blockmap) { gh release upload $tag $blockmap.FullName --clobber }
