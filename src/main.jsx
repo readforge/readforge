@@ -92,8 +92,14 @@ async function chapterFromItem(zip, item, bookTitle, fallback, index) {
   const body = doc.body || doc.documentElement
   const heading = doc.querySelector('h1,h2,h3,h4,h5,h6')?.textContent?.trim() || ''
   const title = cleanChapterTitle(heading, fallback, bookTitle, index)
-  const paragraphs = [...body.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,figcaption')]
-    .map((el, i) => ({ id:`${index}_${i}`, tag:local(el), text:(el.textContent || '').replace(/\s+/g, ' ').trim() }))
+  const nodes = [...body.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,figcaption')]
+  const pathKey = keyText(item.fullPath).slice(-10)
+  const paragraphs = nodes.map((el, i) => {
+      const text = (el.textContent || '').replace(/\s+/g, ' ').trim()
+      const id = `${index}_${pathKey}_${i}`
+      if (text) el.setAttribute('data-rf-read-id', id)
+      return { id, tag:local(el), text }
+    })
     .filter(p => p.text)
   return { title, html:body.innerHTML, paragraphs }
 }
@@ -167,30 +173,67 @@ function Library({ library, onImport, onOpen }) {
     {!books.length ? <section className="empty-state glass"><h2>No books yet</h2><p>Import an EPUB to start reading.</p><button className="primary-button" onClick={onImport}>Import your first book</button></section> : <section className="book-grid">{books.map(book => <button key={book.id} className="book-card glass" onClick={() => onOpen(book)}><div className="book-cover-wrap">{cover(book.title || 'Untitled', book.author || '', book.coverDataUrl)}</div><div className="book-info"><h3>{book.title || 'Untitled'}</h3><p>{book.author || 'Unknown author'}</p><small>{book.progress?.percent || 0}% read</small></div></button>)}</section>}
   </main>
 }
+const THEMES = {
+  library:['Cozy Library','#f4ead9','#271c14','rgba(255,248,235,.9)','#956037'], light:['Modern Light','#f7f8fb','#1f242d','rgba(255,255,255,.9)','#5877e2'], dark:['Soft Dark','#12141b','#eceff7','rgba(28,31,42,.9)','#8da2fb'], sepia:['Sepia','#ead9bc','#2e2115','rgba(255,244,222,.9)','#8a5d36'], midnight:['Midnight Blue','#081321','#e5f0ff','rgba(14,31,54,.9)','#65a5ff'], forest:['Forest','#101b14','#edf8ee','rgba(23,44,30,.9)','#8bcf8b'], contrast:['High Contrast','#000','#fff','#111','#ff0']
+}
+const FONTS = ['Georgia','Cambria','Palatino Linotype','Segoe UI','Arial','Verdana','Tahoma','Times New Roman','Trebuchet MS','Calibri','Consolas','Courier New']
+const DEFAULT_SETTINGS = { tab:'voice', theme:'library', fontFamily:'Georgia', fontSize:20, lineHeight:1.75, paragraphSpacing:1.1, margin:44, textWidth:860, textAlign:'left', rate:1, pitch:1, volume:1, voiceURI:'', follow:'paragraphWash', autoScroll:true }
+function settingsStyle(settings) {
+  const t = THEMES[settings.theme] || THEMES.library
+  return { '--reader-bg':t[1], '--reader-text':t[2], '--reader-panel':t[3], '--reader-soft':t[3], '--reader-accent':t[4], '--font-family':settings.fontFamily, '--font-size':`${settings.fontSize}px`, '--line-height':settings.lineHeight, '--letter-spacing':'0px', '--paragraph-spacing':`${settings.paragraphSpacing}em`, '--reader-margin':`${settings.margin}px`, '--text-width':`${settings.textWidth}px`, '--text-align':settings.textAlign }
+}
+function fmt(key, value) {
+  if (key === 'rate') return `${Number(value).toFixed(1)}x`
+  if (key === 'volume') return `${Math.round(Number(value) * 100)}%`
+  if (key === 'lineHeight') return Number(value).toFixed(2)
+  if (key === 'paragraphSpacing') return `${Number(value).toFixed(1)}em`
+  if (['fontSize','margin','textWidth'].includes(key)) return `${value}px`
+  return value
+}
+function Slider({ label, value, min, max, step, suffixKey, onChange }) {
+  return <label className="setting-row"><span>{label}</span><div className="setting-control"><input type="range" min={min} max={max} step={step} value={value} onChange={e => onChange(Number(e.target.value))} /><b>{fmt(suffixKey, value)}</b></div></label>
+}
+function ReaderTools({ settings, updateSettings, voices, refreshVoices, speaking, speak, stopVoice, status, nowReading }) {
+  const themeOptions = Object.entries(THEMES)
+  return <aside className="reader-sidebar right glass"><h2>Reader Tools</h2><div className="panel-tabs"><button className={settings.tab === 'appearance' ? 'active' : ''} onClick={() => updateSettings({ tab:'appearance' })}>Appearance</button><button className={settings.tab === 'voice' ? 'active' : ''} onClick={() => updateSettings({ tab:'voice' })}>Voice</button><button className={settings.tab === 'follow' ? 'active' : ''} onClick={() => updateSettings({ tab:'follow' })}>Follow</button></div>{settings.tab === 'appearance' ? <div><label className="setting-row"><span>Theme</span><select value={settings.theme} onChange={e => updateSettings({ theme:e.target.value })}>{themeOptions.map(([k,v]) => <option key={k} value={k}>{v[0]}</option>)}</select></label><label className="setting-row"><span>Font</span><select value={settings.fontFamily} onChange={e => updateSettings({ fontFamily:e.target.value })}>{FONTS.map(f => <option key={f}>{f}</option>)}</select></label><Slider label="Font size" value={settings.fontSize} min={12} max={42} step={1} suffixKey="fontSize" onChange={v => updateSettings({ fontSize:v })}/><Slider label="Line height" value={settings.lineHeight} min={1.1} max={2.6} step={.05} suffixKey="lineHeight" onChange={v => updateSettings({ lineHeight:v })}/><Slider label="Paragraph gap" value={settings.paragraphSpacing} min={.4} max={3} step={.1} suffixKey="paragraphSpacing" onChange={v => updateSettings({ paragraphSpacing:v })}/><Slider label="Margins" value={settings.margin} min={12} max={110} step={2} suffixKey="margin" onChange={v => updateSettings({ margin:v })}/><Slider label="Text width" value={settings.textWidth} min={520} max={1250} step={10} suffixKey="textWidth" onChange={v => updateSettings({ textWidth:v })}/><label className="setting-row"><span>Text alignment</span><select value={settings.textAlign} onChange={e => updateSettings({ textAlign:e.target.value })}><option value="left">Left</option><option value="justify">Justify</option><option value="center">Center</option></select></label></div> : settings.tab === 'follow' ? <div><label className="setting-row"><span>Follow-along style</span><select value={settings.follow} onChange={e => updateSettings({ follow:e.target.value })}><option value="off">Off</option><option value="paragraphWash">Highlight paragraph</option><option value="underlineOnly">Underline section</option><option value="spotlight">Spotlight focus</option><option value="minimal">Left marker</option></select></label><label className="setting-row"><span>Auto-scroll to spoken text</span><select value={settings.autoScroll ? 'yes' : 'no'} onChange={e => updateSettings({ autoScroll:e.target.value === 'yes' })}><option value="yes">On</option><option value="no">Off</option></select></label><button className="primary-button full" onClick={() => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()}>⛶ Full screen</button><p className="hint">{nowReading || 'Not reading yet.'}</p></div> : <div><button className="primary-button full" onClick={speak}>{speaking ? '■ Stop read aloud' : '▶ Read aloud'}</button><button className="ghost-button full" onClick={stopVoice}>Stop voice</button><button className="ghost-button full" onClick={refreshVoices}>Refresh voices</button><label className="setting-row"><span>Voice</span><select value={settings.voiceURI} onChange={e => updateSettings({ voiceURI:e.target.value })}>{voices.length ? voices.map(v => <option key={v.voiceURI} value={v.voiceURI}>{v.name} {v.lang ? `(${v.lang})` : ''}</option>) : <option value="">No voices found</option>}</select></label><Slider label="Speed" value={settings.rate} min={.5} max={7} step={.1} suffixKey="rate" onChange={v => updateSettings({ rate:v })}/><Slider label="Pitch" value={settings.pitch} min={0} max={2} step={.1} suffixKey="pitch" onChange={v => updateSettings({ pitch:v })}/><Slider label="Volume" value={settings.volume} min={0} max={1} step={.05} suffixKey="volume" onChange={v => updateSettings({ volume:v })}/><p className="hint">{status || `Speed is ${fmt('rate', settings.rate)}`}</p></div>}</aside>
+}
 function Reader({ book, data, onBack, onProgress }) {
   const [chapterIndex, setChapterIndex] = React.useState(Math.max(0, Math.min(book.progress?.chapterIndex || 0, data.chapters.length - 1)))
   const [speaking, setSpeaking] = React.useState(false)
+  const [voices, setVoices] = React.useState([])
+  const [status, setStatus] = React.useState('')
+  const [activeReadId, setActiveReadId] = React.useState('')
+  const [nowReading, setNowReading] = React.useState('')
+  const [settings, setSettings] = React.useState({ ...DEFAULT_SETTINGS, ...(book.settings || {}) })
   const pageRef = React.useRef(null)
   const chapter = data.chapters[chapterIndex] || data.chapters[0]
-  React.useEffect(() => {
-    setTimeout(() => pageRef.current?.scrollTo({ top:0, left:0 }), 0)
-    onProgress(book.id, { progress:{ chapterIndex, paragraphIndex:0, pageIndex:0, percent:data.chapters.length ? Math.round((chapterIndex / data.chapters.length) * 100) : 0 }, lastOpenedAt:new Date().toISOString() })
-  }, [chapterIndex])
-  const move = delta => setChapterIndex(i => Math.max(0, Math.min(data.chapters.length - 1, i + delta)))
+  const chunks = React.useMemo(() => { let pos = 0; return (chapter?.paragraphs || []).map((p, i) => { const start = pos; pos += p.text.length + 2; return { ...p, index:i, start, end:start + p.text.length } }) }, [chapter])
+  const updateSettings = patch => { const next = { ...settings, ...patch }; setSettings(next); onProgress(book.id, { settings:next }) }
+  const refreshVoices = () => { const list = window.speechSynthesis?.getVoices?.() || []; setVoices(list); if (list.length && !settings.voiceURI) updateSettings({ voiceURI:list[0].voiceURI }); setStatus(`Found ${list.length} voices. Speed is ${fmt('rate', settings.rate)}`) }
+  React.useEffect(() => { refreshVoices(); window.speechSynthesis?.addEventListener?.('voiceschanged', refreshVoices); return () => window.speechSynthesis?.removeEventListener?.('voiceschanged', refreshVoices) }, [])
+  React.useEffect(() => { setTimeout(() => pageRef.current?.scrollTo({ top:0, left:0 }), 0); onProgress(book.id, { progress:{ chapterIndex, paragraphIndex:0, pageIndex:0, percent:data.chapters.length ? Math.round((chapterIndex / data.chapters.length) * 100) : 0 }, lastOpenedAt:new Date().toISOString() }) }, [chapterIndex])
+  React.useEffect(() => { document.querySelectorAll('.active-read').forEach(el => el.classList.remove('active-read','paragraphWash','underlineOnly','spotlight','minimal')); if (!activeReadId || settings.follow === 'off') return; const el = document.querySelector(`[data-rf-read-id="${activeReadId}"]`); if (el) { el.classList.add('active-read', settings.follow); if (settings.autoScroll) el.scrollIntoView({ block:'center', behavior:'smooth' }) } }, [activeReadId, settings.follow, settings.autoScroll])
+  const stopVoice = () => { window.speechSynthesis?.cancel?.(); setSpeaking(false); setStatus('Stopped'); setActiveReadId('') }
+  const move = delta => { stopVoice(); setChapterIndex(i => Math.max(0, Math.min(data.chapters.length - 1, i + delta))) }
   const speak = () => {
-    window.speechSynthesis?.cancel?.()
-    if (speaking) { setSpeaking(false); return }
-    const text = (chapter.paragraphs || []).map(p => p.text).join('\n\n')
-    if (!text) return
+    if (speaking) return stopVoice()
+    const text = chunks.map(c => c.text).join('\n\n')
+    if (!text) { setStatus('No readable text in this section.'); return }
     const u = new SpeechSynthesisUtterance(text)
-    u.onend = () => setSpeaking(false)
-    setSpeaking(true)
-    window.speechSynthesis.speak(u)
+    const voice = voices.find(v => v.voiceURI === settings.voiceURI)
+    if (voice) u.voice = voice
+    u.rate = Math.max(.5, Math.min(7, Number(settings.rate) || 1)); u.pitch = Math.max(0, Math.min(2, Number(settings.pitch) || 1)); u.volume = Math.max(0, Math.min(1, Number(settings.volume) || 1))
+    u.onboundary = e => { if (typeof e.charIndex !== 'number') return; const hit = chunks.find(c => e.charIndex >= c.start && e.charIndex <= c.end) || chunks[chunks.length - 1]; if (hit) { setActiveReadId(hit.id); setNowReading(`Reading ${hit.index + 1} of ${chunks.length}: ${hit.text.slice(0, 90)}${hit.text.length > 90 ? '…' : ''}`) } }
+    u.onend = () => { setSpeaking(false); setStatus('Finished'); setActiveReadId('') }
+    u.onerror = () => { setSpeaking(false); setStatus('Voice failed. Try another voice.') }
+    window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); setSpeaking(true); setStatus(`Reading at ${fmt('rate', settings.rate)}`)
+    if (chunks[0]) { setActiveReadId(chunks[0].id); setNowReading(`Reading 1 of ${chunks.length}: ${chunks[0].text.slice(0, 90)}${chunks[0].text.length > 90 ? '…' : ''}`) }
   }
-  return <main className="reader-screen" style={{ '--reader-bg':'#f4ead9', '--reader-text':'#271c14', '--reader-panel':'rgba(255,248,235,.9)', '--reader-soft':'#e6d3b8', '--reader-accent':'#956037', '--font-family':'Georgia', '--font-size':'20px', '--line-height':1.75, '--letter-spacing':'0px', '--paragraph-spacing':'1.1em', '--reader-margin':'44px', '--text-width':'860px', '--text-align':'left' }}>
-    <header className="reader-topbar glass"><div className="top-left"><button className="ghost-button" onClick={() => { window.speechSynthesis?.cancel?.(); onBack() }}>← Library</button><div className="top-book-meta"><strong>{book.title}</strong><small>{chapter?.title} · {chapterIndex + 1} of {data.chapters.length}</small></div></div><div className="player-bar"><button className="icon-button" onClick={() => move(-1)}>←</button><button className="icon-button" onClick={speak}>{speaking ? '■' : '▶'}</button><button className="icon-button" onClick={() => move(1)}>→</button></div><div className="top-actions" /></header>
+  return <main className="reader-screen" style={settingsStyle(settings)}>
+    <header className="reader-topbar glass"><div className="top-left"><button className="ghost-button" onClick={() => { stopVoice(); onBack() }}>← Library</button><div className="top-book-meta"><strong>{book.title}</strong><small>{chapter?.title} · {chapterIndex + 1} of {data.chapters.length}</small></div></div><div className="player-bar"><button className="icon-button" onClick={() => move(-1)}>←</button><button className="icon-button" onClick={speak}>{speaking ? '■' : '▶'}</button><button className="icon-button" onClick={() => move(1)}>→</button></div><div className="top-actions" /></header>
     <aside className="reader-sidebar left glass"><h2>Contents</h2><div className="toc-list">{data.toc.map((x, i) => <button key={i} className={i === chapterIndex ? 'active' : ''} onClick={() => setChapterIndex(x.chapterIndex)}>{x.label}</button>)}</div></aside>
     <section className="reader-stage"><div className="book-page scroll" ref={pageRef}><div className="chapter-heading"><p>Chapter {chapterIndex + 1} of {data.chapters.length}</p><h1>{chapter?.title}</h1></div><article className="original-html" dangerouslySetInnerHTML={{ __html: chapter?.html || '' }} /><div className="scroll-chapter-controls">{chapterIndex > 0 ? <button onClick={() => move(-1)}>← Previous chapter</button> : <span />}{chapterIndex < data.chapters.length - 1 ? <button onClick={() => move(1)}>Next chapter →</button> : <span>End of book</span>}</div></div></section>
+    <ReaderTools settings={settings} updateSettings={updateSettings} voices={voices} refreshVoices={refreshVoices} speaking={speaking} speak={speak} stopVoice={stopVoice} status={status} nowReading={nowReading} />
   </main>
 }
 function App() {
