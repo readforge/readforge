@@ -1,6 +1,8 @@
 name: Build Fixed EPUB Reader Release
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -15,7 +17,7 @@ jobs:
     runs-on: windows-latest
 
     env:
-      RELEASE_VERSION: 1.7.19
+      RELEASE_VERSION: 1.7.20
 
     steps:
       - name: Check out project
@@ -62,7 +64,7 @@ jobs:
           gh release delete $tag --yes --cleanup-tag 2>$null
           git tag -d $tag 2>$null
           git push origin ":refs/tags/$tag" 2>$null
-          gh release create $tag --target "$env:GITHUB_SHA" --title "ReadForge $tag" --notes "Restored settings, themes, layout controls, Voice Styles, and fixed EPUB rendering." --latest
+          gh release create $tag --target "$env:GITHUB_SHA" --title "ReadForge $tag" --notes "Automatic fixed ReadForge release." --latest
           gh release upload $tag "release/latest.yml" --clobber
           $installer = Get-ChildItem -Path "release" -Filter "*.exe" -File | Select-Object -First 1
           if (-not $installer) { throw "Missing installer exe" }
