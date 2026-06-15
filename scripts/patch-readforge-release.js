@@ -8,4 +8,4 @@ let index = fs.readFileSync(indexPath, 'utf8')
 index = index.replace(/ReadForge v\d+\.\d+\.\d+/g, `ReadForge v${version}`)
 
 fs.writeFileSync(indexPath, index, 'utf8')
-console.log('Build patch applied: version badge only. Reader tools are built into React now.')
+console.log('Stable reader build patch.')
