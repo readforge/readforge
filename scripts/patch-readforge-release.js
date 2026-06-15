@@ -14,4 +14,4 @@ index = index.replace(/<script id="rf-word-follow-overlay">[\s\S]*?<\/script>\s*
 index = index.replace('</body>', `${tag}\n</body>`)
 
 fs.writeFileSync(indexPath, index, 'utf8')
-console.log('Build patch applied: version badge plus non-mutating word-follow overlay.')
+console.log('Build patch applied: stable reader plus non-mutating word overlay.')
