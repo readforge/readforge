@@ -8,10 +8,8 @@ const version = process.env.RELEASE_VERSION || '1.7.21'
 let index = fs.readFileSync(indexPath, 'utf8')
 const overlay = fs.readFileSync(overlayPath, 'utf8')
 const tag = `<script id="rf-word-follow-overlay">\n${overlay}\n</script>`
-
 index = index.replace(/ReadForge v\d+\.\d+\.\d+/g, `ReadForge v${version}`)
 index = index.replace(/<script id="rf-word-follow-overlay">[\s\S]*?<\/script>\s*/g, '')
 index = index.replace('</body>', `${tag}\n</body>`)
-
 fs.writeFileSync(indexPath, index, 'utf8')
-console.log('Build patch applied: stable reader plus non-mutating word overlay.')
+console.log('Stable reader with overlay word follow.')
